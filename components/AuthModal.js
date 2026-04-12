@@ -14,12 +14,14 @@ export default function AuthModal({ isOpen, onClose }) {
   const supabase = createClient();
 
   const handleGoogleLogin = async () => {
-    const { origin } = window.location;
+    // Get the base URL from environment variable or window location
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const redirectUrl = `${baseUrl.replace(/\/$/, "")}/auth/callback`;
 
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
   };
