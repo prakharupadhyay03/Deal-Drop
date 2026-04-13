@@ -67,9 +67,19 @@ export async function POST(request) {
           results.priceChanges++;
 
           if (newPrice < oldPrice) {
-            const {
-              data: { user },
-            } = await supabase.auth.admin.getUserById(product.user_id);
+            if (!product.user_id) {
+              console.warn(`Product ${product.id} has no user_id assigned. Skipping email.`);
+              continue;
+            }
+
+            const { data: userData, error: userError } = await supabase.auth.admin.getUserById(product.user_id);
+
+            if (userError) {
+              console.error(`Failed to fetch user ${product.user_id}:`, userError.message);
+              continue;
+            }
+
+            const user = userData?.user;
 
             if (user?.email) {
               console.log(`Sending price drop alert to ${user.email} for product ${product.id}`);
@@ -84,7 +94,7 @@ export async function POST(request) {
                 console.log(`Email sent successfully to ${user.email}`);
                 results.alertsSent++;
               } else {
-                console.error(`Failed to send email to ${user.email}:`, emailResult.error);
+                console.error(`Resend Error for ${user.email}:`, emailResult.error);
               }
             } else {
               console.warn(`No email found for user ${product.user_id}`);
