@@ -17,11 +17,23 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Use service role to bypass RLS
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Missing Supabase Configuration Envs");
+      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+      process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     );
+
+    console.log("Supabase Client Initialized. Admin availability:", !!supabase.auth.admin);
 
     const { data: products, error: productsError } = await supabase
       .from("products")
@@ -51,7 +63,7 @@ export async function POST(request) {
         const newPrice = parseFloat(productData.currentPrice);
         const oldPrice = parseFloat(product.current_price);
 
-        await supabase
+        const { error: updateError } = await supabase
           .from("products")
           .update({
             current_price: newPrice,
@@ -61,6 +73,14 @@ export async function POST(request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", product.id);
+
+        if (updateError) {
+          console.error(`Failed to update price for product ${product.id}:`, updateError.message);
+          results.failed++;
+          continue;
+        }
+
+        console.log(`Price updated in DB for product ${product.id} to ${newPrice}`);
 
         if (oldPrice !== newPrice) {
           console.log(`Price change detected for product ${product.id}: ${oldPrice} -> ${newPrice}`);
