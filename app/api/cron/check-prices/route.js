@@ -6,9 +6,14 @@ import { sendPriceDropAlert } from "@/lib/email";
 export async function POST(request) {
   try {
     const authHeader = request.headers.get("authorization");
-    const cronSecret = process.env.CRON_SECRET;
+    const cronSecret = process.env.CORN_SECRET;
 
     if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      console.error("Cron Auth Failed:", { 
+        hasSecret: !!cronSecret, 
+        authHeaderPresent: !!authHeader,
+        match: authHeader === `Bearer ${cronSecret}`
+      });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -58,6 +63,7 @@ export async function POST(request) {
           .eq("id", product.id);
 
         if (oldPrice !== newPrice) {
+          console.log(`Price change detected for product ${product.id}: ${oldPrice} -> ${newPrice}`);
           results.priceChanges++;
 
           if (newPrice < oldPrice) {
@@ -66,6 +72,7 @@ export async function POST(request) {
             } = await supabase.auth.admin.getUserById(product.user_id);
 
             if (user?.email) {
+              console.log(`Sending price drop alert to ${user.email} for product ${product.id}`);
               const emailResult = await sendPriceDropAlert(
                 user.email,
                 product,
@@ -74,8 +81,13 @@ export async function POST(request) {
               );
 
               if (emailResult.success) {
+                console.log(`Email sent successfully to ${user.email}`);
                 results.alertsSent++;
+              } else {
+                console.error(`Failed to send email to ${user.email}:`, emailResult.error);
               }
+            } else {
+              console.warn(`No email found for user ${product.user_id}`);
             }
           }
         }
