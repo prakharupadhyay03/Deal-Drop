@@ -58,12 +58,6 @@ export async function POST(request) {
           .eq("id", product.id);
 
         if (oldPrice !== newPrice) {
-          await supabase.from("price_history").insert({
-            product_id: product.id,
-            price: newPrice,
-            currency: productData.currencyCode || product.currency,
-          });
-
           results.priceChanges++;
 
           if (newPrice < oldPrice) {
